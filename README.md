@@ -38,10 +38,15 @@ Deadline for standarize the evluation code
 2. gene analogy (Jiaxin: see Webser paper)
 3. attention (Jie)
 4. Figures:
+
    knn curve (knn.py)
+   
    loss curve (main.py)
+
    Cell embedding (knn.py)
+
    Gene emebdding (geneEmbedding.py)
+
    Attention map (attentionMap.py)
 
 January ?th
