@@ -18,7 +18,9 @@ Scripts to finish
 Dec 25th 
 
 Deadline for standarize the model code
+
 (Jiaxin) mian.py
+
 (Michelle) model_add.py model_cat.py
 
 Dec 28th
