@@ -16,11 +16,13 @@ Scripts to finish
 * [ ] GRN_construction.py
 
 Dec 25th 
+
 Deadline for standarize the model code
 (Jiaxin) mian.py
 (Michelle) model_add.py model_cat.py
 
 Dec 28th
+
 Three people meeting 
 Topics to talk about
 1. Main, model, dataloader
@@ -28,6 +30,7 @@ Topics to talk about
 3. Version control (Pycharm + github)
 
 January ?th
+
 Deadline for standarize the evluation code
 1. knn (curve.. tracking...) (Michelle)
 2. gene analogy (Jiaxin: see Webser paper)
@@ -40,6 +43,7 @@ Deadline for standarize the evluation code
    Attention map (attentionMap.py)
 
 January ?th
+
 Sciplex results anlyses
 
 
