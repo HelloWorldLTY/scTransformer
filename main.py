@@ -36,7 +36,7 @@ from torch.utils.data import Dataset
 import utils
 import vision_transformer as vits
 from vision_transformer import DINOHead
-from DataLoader import scRNACSV
+from DataLoaders import scRNACSV
 from GeneSetCrop import GeneSetCrop
 
 
