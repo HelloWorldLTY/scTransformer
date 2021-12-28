@@ -15,9 +15,7 @@
 Mostly copy-paste from timm library.
 https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
 """
-import math
 from functools import partial
-import numpy as np
 
 import torch
 import torch.nn as nn
@@ -99,7 +97,7 @@ class DINOHead(nn.Module):
 
     def forward(self, x):
         x = self.mlp(x)
-        x = nn.functional.normalize(x, dim=-1, p=2)
+        x = nn.functional.normalize(x, dim=-1, p=2) #TODO: Cannot find reference 'functional' in '__init__.py'
         x = self.last_layer(x)
         return x
 
@@ -150,30 +148,29 @@ class Block(nn.Module):
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
-class PatchEmbed(nn.Module):
-    """ Image to Patch Embedding
-    """
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
-        super().__init__()
-        num_patches = (img_size // patch_size) * (img_size // patch_size)
-        self.img_size = img_size
-        self.patch_size = patch_size
-        self.num_patches = num_patches
 
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        x = self.proj(x).flatten(2).transpose(1, 2)
-        return x
-
-class VisionTransformer(nn.Module):
-  def __init__(self, gene_number = 2000, img_size=[224],in_chans=1, embed_dim=128, mlp_ratio=4., depth = 1, qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 num_heads = 1,
-                 drop_path_rate=0.1, norm_layer=nn.LayerNorm, **kwargs):
+# Now this is cat model
+class VisionTransformerCat(nn.Module):
+  def __init__(self,
+               gene_number=2000,    # Number of genes input into the model
+               gene_embed=128,      # Gene embedding dimension
+               expression_embed=128,# Expression embeddin gdimension
+               depth=1,             # Depth of the model
+               heads=1,             # Heads number of this model
+               mlp_ratio=4.,        #
+               qkv_bias=False,
+               qk_scale=None,
+               drop_rate=0.,
+               attn_drop_rate=0.,
+               drop_path_rate=0.1,
+               norm_layer=nn.LayerNorm,
+               **kwargs):
     super().__init__()
+    # Final output dimension is the sum of gene and expression embedding dimensions.
+    embed_dim = gene_embed + expression_embed
+    self.num_features = self.embed_dim = embed_dim # =3 in this golden truth model
 
-    self.num_features = self.embed_dim = embed_dim # =3 in this golden truth modle
+    # class token initiated as -1
     self.cls_token = nn.Parameter(-1 * torch.ones(1,1,embed_dim))
     self.pos_drop = nn.Dropout(p=drop_rate)
     self.norm = norm_layer(embed_dim)
@@ -181,18 +178,25 @@ class VisionTransformer(nn.Module):
     dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
     self.blocks = nn.ModuleList([
             Block(
-                dim=embed_dim, num_heads= 1, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
+                dim=embed_dim,
+                num_heads=heads,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[i],
+                norm_layer=norm_layer)
             for i in range(depth)])
-    #self.head = nn.Linear(embed_dim, num_classes)
-    self.Embedding = nn.Embedding(gene_number, embed_dim)
+
+    # Initiate the positional embedding (Gene embedding)
+    self.Embedding = nn.Embedding(gene_number, gene_embed)
+    # This line is to adjust if the gene embedding is learnable
     # self.Embedding.weight.requires_grad = False
 
-    self.apply(self._init_weights) #???
     self.act = nn.LeakyReLU()
-    self.exprProj = nn.Linear(1,embed_dim)
-
-
+    self.exprProj = nn.Linear(1, expression_embed)
+    self.apply(self._init_weights) #TODO: how?
 
   def _init_weights(self, m):
     if isinstance(m, nn.Linear):
@@ -218,10 +222,10 @@ class VisionTransformer(nn.Module):
     expr = expr.reshape(B, G, 1)
     expr -= expr.min(1, keepdim=True)[0]
     expr /= (expr.max(1, keepdim=True)[0]+1e-4)
-    #expr = expr.view(B, G, 1)
+    #expr = expr.view(B, G, 1) #TODO: What is this for?
     expr = self.exprProj(expr)
-    #x = torch.cat((expr, geneEmbedding), dim = 2)
-    x = expr + geneEmbedding
+    x = torch.cat((expr, geneEmbedding), dim=2)
+    #x = expr + geneEmbedding
     return x
 
   def forward(self, x):
@@ -250,26 +254,155 @@ class VisionTransformer(nn.Module):
         return output
 
 
+# Now this is cat model
+class VisionTransformerAdd(nn.Module):
+    def __init__(self,
+                 gene_number=2000,  # Number of genes input into the model
+                 gene_embed=128,  # Gene embedding dimension
+                 expression_embed=128,  # Expression embeddin gdimension
+                 depth=1,  # Depth of the model
+                 heads=1,  # Heads number of this model
+                 mlp_ratio=4.,  #
+                 qkv_bias=False,
+                 qk_scale=None,
+                 drop_rate=0.,
+                 attn_drop_rate=0.,
+                 drop_path_rate=0.1,
+                 norm_layer=nn.LayerNorm,
+                 **kwargs):
+        super().__init__()
+        # Final output dimension is the sum of gene and expression embedding dimensions.
+        # TODO: Check the parameter, if gene embedding dimension is the same with the expression embedding
+        embed_dim = gene_embed
+        self.num_features = self.embed_dim = embed_dim  # =3 in this golden truth model
+
+        # class token initiated as -1
+        self.cls_token = nn.Parameter(-1 * torch.ones(1, 1, embed_dim))
+        self.pos_drop = nn.Dropout(p=drop_rate)
+        self.norm = norm_layer(embed_dim)
+
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
+        self.blocks = nn.ModuleList([
+            Block(
+                dim=embed_dim,
+                num_heads=heads,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[i],
+                norm_layer=norm_layer)
+            for i in range(depth)])
+
+        # Initiate the positional embedding (Gene embedding)
+        self.Embedding = nn.Embedding(gene_number, gene_embed)
+        # This line is to adjust if the gene embedding is learnable
+        # self.Embedding.weight.requires_grad = False
+
+        self.act = nn.LeakyReLU()
+        self.exprProj = nn.Linear(1, expression_embed)
+        self.apply(self._init_weights)  # TODO: how?
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    def prepare_tokens(self, x):
+        B, L = x.shape
+        x = self.ReformatInput_cat(x)
+        cls_tokens = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        return self.pos_drop(x)
+
+    def ReformatInput_cat(self, x):
+        B, G_2 = x.shape
+        G = int(G_2 / 2)
+        expr, index = torch.split(x, (G, G), dim=1)
+        geneEmbedding = self.Embedding(index.int())
+        expr = expr.reshape(B, G, 1)
+        expr -= expr.min(1, keepdim=True)[0]
+        expr /= (expr.max(1, keepdim=True)[0] + 1e-4)
+        # expr = expr.view(B, G, 1) #TODO: What is this for?
+        expr = self.exprProj(expr)
+        x = expr + geneEmbedding
+        return x
+
+    def forward(self, x):
+        B, L = x.shape
+        x = self.prepare_tokens(x)
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
+        return x[:, 0]
+
+    def get_last_selfattention(self, x):
+        x = self.prepare_tokens(x)
+        for i, blk in enumerate(self.blocks):
+            if i < len(self.blocks) - 1:
+                x = blk(x)
+            else:
+                return blk(x, return_attention=True)
+
+    def get_intermediate_layers(self, x, n=1):
+        x = self.prepare_tokens(x)
+        output = []
+        for i, blk in enumerate(self.blocks):
+            x = blk(x)
+            if len(self.blocks) - i <= n:
+                output.append(self.norm(x))
+        return output
 
 
-
-
-def vit_tiny(gene_number = 2000, embed_dim = 128, patch_size=16, **kwargs):
-    model = VisionTransformer(
-        gene_number = gene_number,
-        patch_size=patch_size, embed_dim= embed_dim, depth=3, num_heads=1, mlp_ratio=4,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+# Wrapper functions
+def vit_cat(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=2, **kwargs):
+    model = VisionTransformerCat(
+             gene_number=gene_number,
+             gene_embed=gene_embed,
+             expression_embed=expression_embed,
+             depth=depth,
+             heads=heads,
+             mlp_ratio=4,
+             qkv_bias=True,
+             norm_layer=partial(nn.LayerNorm, eps=1e-6),
+             **kwargs)
     return model
 
-def vit_small(patch_size=16, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+def vit_add(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=2, **kwargs):
+    model = VisionTransformerAdd(
+            gene_number=gene_number,
+            gene_embed=gene_embed,
+            expression_embed=expression_embed,
+            depth=depth,
+            heads=heads,
+            mlp_ratio=4,
+            qkv_bias=True,
+            norm_layer=partial(nn.LayerNorm, eps=1e-6),
+            **kwargs)
     return model
 
 
-def vit_base(patch_size=16, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    return model
+    # def vit_tiny(gene_number = 2000, embed_dim = 128, patch_size=16, **kwargs):
+#     model = VisionTransformer(
+#         gene_number = gene_number,
+#         patch_size=patch_size, embed_dim= embed_dim, depth=3, num_heads=1, mlp_ratio=4,
+#         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+#     return model
+#
+# def vit_small(patch_size=16, **kwargs):
+#     model = VisionTransformer(
+#         patch_size=patch_size, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4,
+#         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+#     return model
+#
+#
+# def vit_base(patch_size=16, **kwargs):
+#     model = VisionTransformer(
+#         patch_size=patch_size, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4,
+#         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+#     return model

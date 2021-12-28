@@ -37,8 +37,8 @@ from torch.utils.data import Dataset
 import utils
 
 # import models
-import models.vit_cat as vits
-from models.vit_cat import DINOHead
+import models.vits as vits
+from models.vits import DINOHead
 from DataLoaders import scRNACSV
 from GeneSetCrop import GeneSetCrop
 
