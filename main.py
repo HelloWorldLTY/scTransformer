@@ -33,9 +33,12 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
+# import from files
 import utils
-import vision_transformer as vits
-from vision_transformer import DINOHead
+
+# import models
+import models.vit_cat as vits
+from models.vit_cat import DINOHead
 from DataLoaders import scRNACSV
 from GeneSetCrop import GeneSetCrop
 
@@ -49,12 +52,30 @@ def get_args_parser():
     parser = argparse.ArgumentParser('DINO', add_help=False)
 
     # Model parameters
+    #TODO: decide if we still need --arch parameter here.
     parser.add_argument('--arch', default='vit_small', type=str,
         choices=['vit_tiny', 'vit_small', 'vit_base'] ,
         help="""Name of architecture to train. For quick experiments with ViTs,
         we recommend using vit_tiny or vit_small.""")
-    parser.add_argument('--out_dim', default=65536, type=int, help="""Dimensionality of
+    # Jiaxin (Dec 28) : added the depth, head parameter to adjust the size of the model
+    parser.add_argument('--depth', default= 3 , type= int,
+                        help="""Number of self-attention layers""")
+    parser.add_argument('--head', default=2, type=int,
+                        help="""Number of multi-heads""")
+    # Jiaxin changed the default out_dim to 30
+    parser.add_argument('--out_dim', default=30, type=int, help="""Dimensionality of
         the output representation. For complex and large datasets large values (like 65k) work well.""")
+
+    ## Embedding dimension parameters
+    # Jiaxin (Dec 28) added to the main
+    parser.add_argument('--fuse_mode', default='cat',
+                        choices=['add', 'cat'] ,
+                        type=str,
+                        help="""The mode of fusing gene embedding and expression embedding""")
+    parser.add_argument('--gene_embed', default=128, type=int,
+                        help="""gene embedding dimension""")
+    parser.add_argument('--expression_embed', default=128, type=int,
+                        help="""expression embedding dimension""")
 
     ## Model parameters typically not in use
     parser.add_argument('--norm_last_layer', default=True, type=utils.bool_flag,
@@ -130,7 +151,8 @@ def get_args_parser():
         help='Please specify path to the meta file.')
     parser.add_argument('--output_dir', default=".", type=str, help='Path to save logs and checkpoints.')
     parser.add_argument('--saveckp_freq', default=20, type=int, help='Save checkpoint every x epochs.')
-    parser.add_argument('--seed', default=0, type=int, help='Random seed.')
+    # Jiaxin (Dec 28) Default seed changed to 42
+    parser.add_argument('--seed', default=42, type=int, help='Random seed.')
     parser.add_argument('--num_workers', default=10, type=int, help='Number of data loading workers per GPU.')
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
@@ -165,7 +187,7 @@ def train_dino(args):
     trainset_length = int(len(dataset) * 0.8)
     testset_length = len(dataset) - trainset_length
     dataset, testset = torch.utils.data.random_split(dataset, [trainset_length, testset_length],
-        generator=torch.Generator().manual_seed(42))
+        generator=torch.Generator().manual_seed(args.seed))
 
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
@@ -176,7 +198,7 @@ def train_dino(args):
         pin_memory=True,
         drop_last=True,
     )
-    train_features, train_labels = next(iter(data_loader))
+
 
     print(f"Data loaded: there are {len(dataset)} cells.")
 
@@ -186,7 +208,7 @@ def train_dino(args):
     # if the network is a Vision Transformer (i.e. vit_tiny, vit_small, vit_base)
     if args.arch in vits.__dict__.keys():
         student = vits.__dict__[args.arch](
-            gene_number = gene_number
+            gene_number = gene_number,
             drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
         teacher = vits.__dict__[args.arch](
