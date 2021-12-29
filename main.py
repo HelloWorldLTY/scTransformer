@@ -27,8 +27,8 @@ import torch.nn as nn
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch.nn.functional as F
-from torchvision import datasets, transforms
-from torchvision import models as torchvision_models
+#from torchvision import datasets, transforms
+#from torchvision import models as torchvision_models
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
@@ -44,21 +44,23 @@ from GeneSetCrop import GeneSetCrop
 
 
 
-torchvision_archs = sorted(name for name in torchvision_models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(torchvision_models.__dict__[name]))
+# torchvision_archs = sorted(name for name in torchvision_models.__dict__
+#     if name.islower() and not name.startswith("__")
+#     and callable(torchvision_models.__dict__[name]))
 
 def get_args_parser():
     parser = argparse.ArgumentParser('DINO', add_help=False)
 
     # Model parameters
     #TODO: decide if we still need --arch parameter here.
-    parser.add_argument('--arch', default='vit_small', type=str,
-        choices=['vit_tiny', 'vit_small', 'vit_base'] ,
-        help="""Name of architecture to train. For quick experiments with ViTs,
-        we recommend using vit_tiny or vit_small.""")
+    #
+    # parser.add_argument('--arch', default='vit_small', type=str,
+    #     choices=['vit_tiny', 'vit_small', 'vit_base'] ,
+    #     help="""Name of architecture to train. For quick experiments with ViTs,
+    #     we recommend using vit_tiny or vit_small.""")
+
     # Jiaxin (Dec 28) : added the depth, head parameter to adjust the size of the model
-    parser.add_argument('--depth', default= 3 , type= int,
+    parser.add_argument('--depth', default=3, type=int,
                         help="""Number of self-attention layers""")
     parser.add_argument('--head', default=2, type=int,
                         help="""Number of multi-heads""")
@@ -69,7 +71,7 @@ def get_args_parser():
     ## Embedding dimension parameters
     # Jiaxin (Dec 28) added to the main
     parser.add_argument('--fuse_mode', default='cat',
-                        choices=['add', 'cat'] ,
+                        choices=['add', 'cat'],
                         type=str,
                         help="""The mode of fusing gene embedding and expression embedding""")
     parser.add_argument('--gene_embed', default=128, type=int,
@@ -145,6 +147,9 @@ def get_args_parser():
         Used for small local view cropping of multi-crop.""")
 
     # Misc
+    # Jiaxin (Dec 28) new parameter to determine if we need to train with gpu
+    parser.add_argument('--use_gpu', type=utils.bool_flag, default=True, help="""Whether or not
+        to use gpu to train""")
     parser.add_argument('--expr_path', default='/path/to/imagenet/train/', type=str,
         help='Please specify path to the expression matrix.')
     parser.add_argument('--meta_path', default='/path/to/imagenet/train/', type=str,
@@ -205,24 +210,73 @@ def train_dino(args):
     # ============ building student and teacher networks ... ============
     # we changed the name DeiT-S for ViT-S to avoid confusions
     args.arch = args.arch.replace("deit", "vit")
-    # if the network is a Vision Transformer (i.e. vit_tiny, vit_small, vit_base)
-    if args.arch in vits.__dict__.keys():
-        student = vits.__dict__[args.arch](
-            gene_number = gene_number,
+
+    # Jiaxin (Dec 28) Use new parameter to initiate the models
+    if args.fuse_mode == 'cat':
+        student = vits.__dict__['vit_cat'](
+            gene_number=gene_number,
+            gene_embed=args.gene_embed,
+            expression_embed=args.expression_embed,
+            depth=args.depth,
+            heads=args.heads,
             drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
-        teacher = vits.__dict__[args.arch](
-            gene_number = gene_number,
+        teacher = vits.__dict__['vit_cat'](
+            gene_number=gene_number,
+            gene_embed=args.gene_embed,
+            expression_embed=args.expression_embed,
+            depth=args.depth,
+            heads=args.heads,
+            drop_path_rate=args.drop_path_rate,  # stochastic depth
+        )
+        embed_dim = student.embed_dim
+    elif args.fuse_mode == 'add':
+        student = vits.__dict__['vit_add'](
+            gene_number=gene_number,
+            gene_embed=args.gene_embed,
+            expression_embed=args.expression_embed,
+            depth=args.depth,
+            heads=args.heads,
+            drop_path_rate=args.drop_path_rate,  # stochastic depth
+        )
+        teacher = vits.__dict__['vit_add'](
+            gene_number=gene_number,
+            gene_embed=args.gene_embed,
+            expression_embed=args.expression_embed,
+            depth=args.depth,
+            heads=args.heads,
+            drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
         embed_dim = student.embed_dim
 
-    # otherwise, we check if the architecture is in torchvision models
-    elif args.arch in torchvision_models.__dict__.keys():
-        student = torchvision_models.__dict__[args.arch]()
-        teacher = torchvision_models.__dict__[args.arch]()
-        embed_dim = student.fc.weight.shape[1]
-    else:
-        print(f"Unknow architecture: {args.arch}")
+    # # Deprecated ways to initiate teacher and student
+    # # if the network is a Vision Transformer (i.e. vit_tiny, vit_small, vit_base)
+    # if args.arch in vits.__dict__.keys():
+    #     student = vits.__dict__[args.arch](
+    #         gene_number=gene_number,
+    #         gene_embed=args.gene_embed,
+    #         expression_embed=args.expression_embed,
+    #         depth=args.depth,
+    #         heads=args.heads,
+    #         drop_path_rate=args.drop_path_rate,  # stochastic depth
+    #     )
+    #     teacher = vits.__dict__[args.arch](
+    #         gene_number=gene_number,
+    #         gene_embed=args.gene_embed,
+    #         expression_embed=args.expression_embed,
+    #         depth=args.depth,
+    #         heads=args.heads,
+    #         drop_path_rate=args.drop_path_rate,  # stochastic depth
+    #     )
+    #     embed_dim = student.embed_dim
+    #
+    # # otherwise, we check if the architecture is in torchvision models
+    # elif args.arch in torchvision_models.__dict__.keys():
+    #     student = torchvision_models.__dict__[args.arch]()
+    #     teacher = torchvision_models.__dict__[args.arch]()
+    #     embed_dim = student.fc.weight.shape[1]
+    # else:
+    #     print(f"Unknow architecture: {args.arch}")
 
     # multi-crop wrapper handles forward with inputs of different resolutions
     student = utils.MultiCropWrapper(student, DINOHead(
@@ -461,52 +515,52 @@ class DINOLoss(nn.Module):
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
 
-class DataAugmentationDINO(object):
-    def __init__(self, global_crops_scale, local_crops_scale, local_crops_number):
-        flip_and_color_jitter = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomApply(
-                [transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
-                p=0.8
-            ),
-            transforms.RandomGrayscale(p=0.2),
-        ])
-        normalize = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        ])
-
-        # first global crop
-        self.global_transfo1 = transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=global_crops_scale, interpolation=Image.BICUBIC),
-            flip_and_color_jitter,
-            utils.GaussianBlur(1.0),
-            normalize,
-        ])
-        # second global crop
-        self.global_transfo2 = transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=global_crops_scale, interpolation=Image.BICUBIC),
-            flip_and_color_jitter,
-            utils.GaussianBlur(0.1),
-            utils.Solarization(0.2),
-            normalize,
-        ])
-        # transformation for the local small crops
-        self.local_crops_number = local_crops_number
-        self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(96, scale=local_crops_scale, interpolation=Image.BICUBIC),
-            flip_and_color_jitter,
-            utils.GaussianBlur(p=0.5),
-            normalize,
-        ])
-
-    def __call__(self, image):
-        crops = []
-        crops.append(self.global_transfo1(image))
-        crops.append(self.global_transfo2(image))
-        for _ in range(self.local_crops_number):
-            crops.append(self.local_transfo(image))
-        return crops
+# class DataAugmentationDINO(object):
+#     def __init__(self, global_crops_scale, local_crops_scale, local_crops_number):
+#         flip_and_color_jitter = transforms.Compose([
+#             transforms.RandomHorizontalFlip(p=0.5),
+#             transforms.RandomApply(
+#                 [transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
+#                 p=0.8
+#             ),
+#             transforms.RandomGrayscale(p=0.2),
+#         ])
+#         normalize = transforms.Compose([
+#             transforms.ToTensor(),
+#             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+#         ])
+#
+#         # first global crop
+#         self.global_transfo1 = transforms.Compose([
+#             transforms.RandomResizedCrop(224, scale=global_crops_scale, interpolation=Image.BICUBIC),
+#             flip_and_color_jitter,
+#             utils.GaussianBlur(1.0),
+#             normalize,
+#         ])
+#         # second global crop
+#         self.global_transfo2 = transforms.Compose([
+#             transforms.RandomResizedCrop(224, scale=global_crops_scale, interpolation=Image.BICUBIC),
+#             flip_and_color_jitter,
+#             utils.GaussianBlur(0.1),
+#             utils.Solarization(0.2),
+#             normalize,
+#         ])
+#         # transformation for the local small crops
+#         self.local_crops_number = local_crops_number
+#         self.local_transfo = transforms.Compose([
+#             transforms.RandomResizedCrop(96, scale=local_crops_scale, interpolation=Image.BICUBIC),
+#             flip_and_color_jitter,
+#             utils.GaussianBlur(p=0.5),
+#             normalize,
+#         ])
+#
+#     def __call__(self, image):
+#         crops = []
+#         crops.append(self.global_transfo1(image))
+#         crops.append(self.global_transfo2(image))
+#         for _ in range(self.local_crops_number):
+#             crops.append(self.local_transfo(image))
+#         return crops
 
 
 
