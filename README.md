@@ -1,7 +1,14 @@
 # scTransformer
 ## Input Data Format
-* Expression matrix
-* Meta matrix
+* Expression matrix\
+A **gene by cell** matrix stored in .csv file, with row names (gene name) and column names (cell names)
+* Meta matrix\
+A **cell by label** matrix stored in .csv file.
+### Prepared data
+* bmcite
+
+* 
+* 
 ## Scripts
 Standarize the code we have in the notebooks now:
 * Delete the unused parameters and write documents of the input out parameters.
