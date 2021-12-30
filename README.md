@@ -1,15 +1,21 @@
 # scTransformer
+## Input Data Format
+* Expression matrix
+* Meta matrix
 ## Scripts
 Standarize the code we have in the notebooks now:
 * Delete the unused parameters and write documents of the input out parameters.
 * Write README file and Add comments to the scripts.
 
-Scripts to finish
-* [X] scDataLoader.py
-* [ ] main.py
-* [ ] model.py 
+Scripts to finish (Final editing: NAME, DATE)
+* [X] scDataLoader.py (Jiaxin Nov 20)
+* [X] GeneSetCrop.py (Jiaxin Dec 29)
+* [ ] GeneSetCropFixGeneNumber.py (Jiaxin Dec 29)
+* [X] main.py (Jiaxin Dec 29)
+* [X] model.py (Jiaxin Dec 29)
   - [X] model_add.py
   - [X] model_cat.py
+  - [ ] Perceiver.py (Jiaxin Dec 29)
 * [ ] knn_acc.py
 * [ ] attention_visualization.py
 * [ ] gene_embedding.py
