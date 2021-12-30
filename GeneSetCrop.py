@@ -1,10 +1,13 @@
 # Copyright © 2019 Jiaxin Li <jli2274@wisc.edu>
 # Distributed under terms of the MIT license.
+import numpy as np
+import torch
+
 
 def crop(x, size):
     length = x.shape[0]
     crop_size = int(length * size)
-    index = np.random.choice(length, size = crop_size, replace = False)
+    index = np.random.choice(length, size=crop_size, replace=False)
     coor = torch.from_numpy(index)
     data = x[index, ]
     input = torch.cat([data, coor]).float()
