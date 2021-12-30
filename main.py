@@ -62,7 +62,7 @@ def get_args_parser():
     # Jiaxin (Dec 28) : added the depth, head parameter to adjust the size of the model
     parser.add_argument('--depth', default=3, type=int,
                         help="""Number of self-attention layers""")
-    parser.add_argument('--head', default=2, type=int,
+    parser.add_argument('--heads', default=2, type=int,
                         help="""Number of multi-heads""")
     # Jiaxin changed the default out_dim to 30
     parser.add_argument('--out_dim', default=30, type=int, help="""Dimensionality of
@@ -154,6 +154,8 @@ def get_args_parser():
         help='Please specify path to the expression matrix.')
     parser.add_argument('--meta_path', default='/path/to/imagenet/train/', type=str,
         help='Please specify path to the meta file.')
+    parser.add_argument('--label_name', default='perturb', type=str,
+                        help='Please specify the name of label column in the meta file.')
     parser.add_argument('--output_dir', default=".", type=str, help='Path to save logs and checkpoints.')
     parser.add_argument('--saveckp_freq', default=20, type=int, help='Save checkpoint every x epochs.')
     # Jiaxin (Dec 28) Default seed changed to 42
@@ -187,7 +189,7 @@ def train_dino(args):
         args.local_crops_scale,
         args.local_crops_number,
     )
-    dataset = scRNACSV(expr, meta, "perturb", instance = False, transform=transform)
+    dataset = scRNACSV(expr, meta, args.label_name, instance = False, transform=transform)
 
     trainset_length = int(len(dataset) * 0.8)
     testset_length = len(dataset) - trainset_length
@@ -209,7 +211,7 @@ def train_dino(args):
 
     # ============ building student and teacher networks ... ============
     # we changed the name DeiT-S for ViT-S to avoid confusions
-    args.arch = args.arch.replace("deit", "vit")
+    # args.arch = args.arch.replace("deit", "vit")
 
     # Jiaxin (Dec 28) Use new parameter to initiate the models
     if args.fuse_mode == 'cat':
@@ -308,7 +310,7 @@ def train_dino(args):
     # there is no backpropagation through the teacher, so no need for gradients
     for p in teacher.parameters():
         p.requires_grad = False
-    print(f"Student and Teacher are built: they are both {args.arch} network.")
+    print(f"Student and Teacher are built!") #  they are both {args.arch} network.")
 
     # ============ preparing loss ... ============
     dino_loss = DINOLoss(
