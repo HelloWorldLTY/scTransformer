@@ -145,6 +145,10 @@ def get_args_parser():
     parser.add_argument('--local_crops_scale', type=float, nargs='+', default= 0.05,
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for small local view cropping of multi-crop.""")
+    parser.add_argument('--fix_number_gene_crop', type=utils.bool_flag, default=False, help="""Whether or not use a fixed 
+    number of genes in the crop""")
+    parser.add_argument('--local_crop_gene_number', type=int, default=250, help="""Local crop gene number""")
+    parser.add_argument('--global_crop_gene_number', type=int, default=500, help="""Global crop gene number""")
 
     # Misc
     # Jiaxin (Dec 28) new parameter to determine if we need to train with gpu
@@ -179,16 +183,19 @@ def train_dino(args):
     cudnn.benchmark = True
 
     # ============ preparing data ... ============
-    expr = pd.read_csv(args.expr_path, index_col = 0)
-    meta = pd.read_csv(args.meta_path, index_col = 0)
+    expr = pd.read_csv(args.expr_path, index_col=0)
+    meta = pd.read_csv(args.meta_path, index_col=0)
     gene_number = expr.shape[0]
 
-
     transform = GeneSetCrop(
-        args.global_crops_scale,
-        args.local_crops_scale,
-        args.local_crops_number,
+        global_crops_scale=args.global_crops_scale,
+        local_crops_scale=args.local_crops_scale,
+        local_crops_number=args.local_crops_number,
+        fix_number=args.fix_number_gene_crop,
+        global_crop_gene_number=args.global_crop_gene_number,
+        local_crop_gene_number=args.local_crop_gene_number
     )
+
     dataset = scRNACSV(expr, meta, args.label_name, instance = False, transform=transform)
 
     trainset_length = int(len(dataset) * 0.8)

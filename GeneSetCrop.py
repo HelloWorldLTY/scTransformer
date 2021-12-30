@@ -10,8 +10,8 @@ def crop_proportion(x, size):
     index = np.random.choice(length, size=crop_size, replace=False)
     coor = torch.from_numpy(index)
     data = x[index, ]
-    input = torch.cat([data, coor]).float()
-    return input
+    one_input = torch.cat([data, coor]).float()
+    return one_input
 
 # Crop by a fixed number
 def crop_number(x, number):
