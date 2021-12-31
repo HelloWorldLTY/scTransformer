@@ -10,9 +10,15 @@ A **cell by label** matrix stored in .csv file.
 * 
 * 
 ## Scripts
+### Usage
+
+```bash
+python3 main.py --expr_path "/content/drive/Shareddrives/Documentation/Data/bm/rna_scale_bmcite.csv" --meta_path "/content/drive/Shareddrives/Documentation/Data/bm/meta.csv" --label_name "celltype.l2" --output_dir '../result' --fuse_mode "cat" --fix_number True
+```
 Standarize the code we have in the notebooks now:
 * Delete the unused parameters and write documents of the input out parameters.
 * Write README file and Add comments to the scripts.
+* 
 
 Scripts to finish (Final editing: NAME, DATE)
 * [X] scDataLoader.py (Jiaxin Nov 20)
@@ -23,18 +29,30 @@ Scripts to finish (Final editing: NAME, DATE)
   - [X] model_add.py
   - [X] model_cat.py
   - [ ] Perceiver.py (Jiaxin Dec 29)
-* [ ] knn_acc.py
-* [ ] attention_visualization.py
-* [ ] gene_embedding.py
-* [ ] GRN_construction.py
+* [ ] knn_acc.py (Michelle)
+* [ ] attention_visualization.py (Jie)
+* [ ] gene_embedding.py (Jiaxin)
+* [ ] GRN_construction.py 
 
-Dec 25th 
+Saturday\ 
+TODO\ 
+#### Dataset (Sat ~ Mon)
+Cell nomalization + log transformation
+* [X] bmcite 
+* [ ] perturbation immunology(Jiaxin)
+* [ ] perturbation (Michelle)
+* [ ] Sciplex (Jie)
 
-Deadline for standarize the model code
+#### Visualization (Sat)
 
-(Jiaxin) mian.py
+#### Model
+* [ ] Perceiver
+* [ ] Attention Downstream analysis (class token) ~ Cell type biomarker
+* [ ] Attention map of regulators ~ GRN 
+* [ ] gene embedding 
 
-(Michelle) model_add.py model_cat.py
+
+
 
 Dec 28th
 
@@ -43,6 +61,8 @@ Topics to talk about
 1. Main, model, dataloader
 2. Local GPU set up; Yale cluster set up (Training time and resource estimation)
 3. Version control (Pycharm + github)
+
+
 
 January ?th
 
