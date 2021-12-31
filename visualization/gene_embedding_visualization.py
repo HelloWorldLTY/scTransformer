@@ -1,19 +1,13 @@
 import models.vits as vits
 import utils
-
-
-
 import umap
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
 import scprep
-import numpy as np
-import math
 import argparse
 from pathlib import Path
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('GeneEmbedding', add_help=True)
+    parser = argparse.ArgumentParser('GeneEmbedding', add_help=False)
 
     parser.add_argument('--checkpoint_path', default='./', type=str,
                         help="""The path to the checkpoint""")
@@ -31,7 +25,7 @@ def get_args_parser():
 
 def gene_embedding_visualization(args):
     if args.model_category == 'vit':
-        model = vits.__dict__[args.model_name]
+        model = vits.__dict__[args.model_name](gene_number=args.gene_number)
     else:
         model = None
     utils.load_pretrained_weights(model, args.checkpoint_path, "student")
@@ -44,7 +38,6 @@ def gene_embedding_visualization(args):
     umap_operator = umap.UMAP(n_components=2, n_neighbors=30)  # n_components = 2: 2-dim umap
     Y_UMAP = umap_operator.fit_transform(emb_cor)
 
-    import matplotlib.pyplot as plt
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 6))
 
     scprep.plot.scatter2d(Y_UMAP, label_prefix="umap", title="umap_x",
@@ -58,11 +51,11 @@ def gene_embedding_visualization(args):
                           ticks=False, cmap='Spectral', ax=ax3)
 
     plt.tight_layout()
-    plt.savefig(args.output_dir, dpi=100)
+    fig.savefig(args.output_dir, dpi=100)
     return None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('GeneEmbedding', parents=[get_args_parser()])
     args = parser.parse_args()
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    #Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     gene_embedding_visualization(args)

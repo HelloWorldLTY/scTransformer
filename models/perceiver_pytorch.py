@@ -128,11 +128,11 @@ class Perceiver(nn.Module):
         num_freq_bands,
         depth,
         max_freq,
-        input_channels=1, # For the single cell data, we only have one channel
-        input_axis=1, # It's a one dimension vector, not 2 dimentional image
+        input_channels=1,  # For the single cell data, we only have one channel
+        input_axis=1,  # It's a one dimension vector, not 2 dimentional image
         num_latents = 512,
         latent_dim = 512,
-        cross_heads = 1,
+        cross_heads=1,
         latent_heads = 8,
         cross_dim_head = 64,
         latent_dim_head = 64,
@@ -184,7 +184,7 @@ class Perceiver(nn.Module):
         # Random initialized latent array
         self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
 
-        get_cross_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, input_dim, heads = cross_heads, dim_head = cross_dim_head, dropout = attn_dropout), context_dim = input_dim)
+        get_cross_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, input_dim, heads=cross_heads, dim_head = cross_dim_head, dropout = attn_dropout), context_dim = input_dim)
         get_cross_ff = lambda: PreNorm(latent_dim, FeedForward(latent_dim, dropout = ff_dropout))
         get_latent_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, heads = latent_heads, dim_head = latent_dim_head, dropout = attn_dropout))
         get_latent_ff = lambda: PreNorm(latent_dim, FeedForward(latent_dim, dropout = ff_dropout))
@@ -229,7 +229,7 @@ class Perceiver(nn.Module):
             # calculate fourier encoded positions in the range of [-1, 1], for all axis
 
             axis_pos = list(map(lambda size: torch.linspace(-1., 1., steps = size, device = device), axis))
-            pos = torch.stack(torch.meshgrid(*axis_pos, indexing = 'ij'), dim = -1)
+            pos = torch.stack(torch.meshgrid(*axis_pos, indexing='ij'), dim = -1)
             enc_pos = fourier_encode(pos, self.max_freq, self.num_freq_bands)
             enc_pos = rearrange(enc_pos, '... n d -> ... (n d)')
             enc_pos = repeat(enc_pos, '... -> b ...', b = b)
@@ -239,13 +239,13 @@ class Perceiver(nn.Module):
         # concat to channels of data and flatten axis
 
         data = rearrange(data, 'b ... d -> b (...) d')
-
-        x = repeat(self.latents, 'n d -> b n d', b = b)
+        # x is the latent array
+        x = repeat(self.latents, 'n d -> b n d', b=b)
 
         # layers
 
         for cross_attn, cross_ff, self_attns in self.layers:
-            x = cross_attn(x, context = data, mask = mask) + x
+            x = cross_attn(x, context=data, mask=mask) + x
             x = cross_ff(x) + x
 
             for self_attn, self_ff in self_attns:
