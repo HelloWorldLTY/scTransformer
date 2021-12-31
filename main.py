@@ -117,7 +117,7 @@ def get_args_parser():
 
     parser.add_argument('--batch_size_per_gpu', default=64, type=int,
         help='Per-GPU batch-size : number of distinct images loaded on one GPU.')
-    parser.add_argument('--epochs', default=100, type=int, help='Number of epochs of training.')
+    parser.add_argument('--epochs', default=500, type=int, help='Number of epochs of training.')
 
     parser.add_argument('--freeze_last_layer', default=1, type=int, help="""Number of epochs
         during which we keep the output layer fixed. Typically doing so during
@@ -153,7 +153,7 @@ def get_args_parser():
     # Misc
     # Jiaxin (Dec 28) new parameter to determine if we need to train with gpu
     parser.add_argument('--use_gpu', type=utils.bool_flag, default=True, help="""Whether or not
-        to use gpu to train""")
+        to use gpu to train""") # TODO: Incomplete
     parser.add_argument('--expr_path', default='/path/to/imagenet/train/', type=str,
         help='Please specify path to the expression matrix.')
     parser.add_argument('--meta_path', default='/path/to/imagenet/train/', type=str,
@@ -186,6 +186,8 @@ def train_dino(args):
     expr = pd.read_csv(args.expr_path, index_col=0)
     meta = pd.read_csv(args.meta_path, index_col=0)
     gene_number = expr.shape[0]
+
+    print(f'This dataset has {gene_number} genes!')
 
     transform = GeneSetCrop(
         global_crops_scale=args.global_crops_scale,

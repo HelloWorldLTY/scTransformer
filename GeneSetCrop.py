@@ -36,13 +36,13 @@ class GeneSetCrop(object):
     def __call__(self, x):
         inputs = []
         if self.fix_number:
-            global1 = crop_number(x, self.global_crops_scale)
-            global2 = crop_number(x, self.global_crops_scale)
+            global1 = crop_number(x, self.global_crop_gene_number)
+            global2 = crop_number(x, self.global_crop_gene_number)
             inputs.append(global1)
             inputs.append(global2)
 
             for i in range(self.local_crops_number):
-                local = crop_number(x, self.local_crops_scale)
+                local = crop_number(x, self.local_crop_gene_number)
                 inputs.append(local)
         else:
             global1 = crop_proportion(x, self.global_crops_scale)

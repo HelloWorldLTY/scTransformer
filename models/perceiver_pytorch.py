@@ -128,8 +128,8 @@ class Perceiver(nn.Module):
         num_freq_bands,
         depth,
         max_freq,
-        input_channels = 3,
-        input_axis = 2,
+        input_channels=1, # For the single cell data, we only have one channel
+        input_axis=1, # It's a one dimension vector, not 2 dimentional image
         num_latents = 512,
         latent_dim = 512,
         cross_heads = 1,
@@ -181,6 +181,7 @@ class Perceiver(nn.Module):
         fourier_channels = (input_axis * ((num_freq_bands * 2) + 1)) if fourier_encode_data else 0
         input_dim = fourier_channels + input_channels
 
+        # Random initialized latent array
         self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
 
         get_cross_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, input_dim, heads = cross_heads, dim_head = cross_dim_head, dropout = attn_dropout), context_dim = input_dim)
