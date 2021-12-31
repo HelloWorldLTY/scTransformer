@@ -135,17 +135,17 @@ def get_args_parser():
     parser.add_argument('--drop_path_rate', type=float, default=0.1, help="stochastic depth rate")
 
     # Multi-crop parameters
-    parser.add_argument('--global_crops_scale', type=float, nargs='+', default=0.1,
+    parser.add_argument('--global_crops_scale', type=float, nargs='+', default=0.25,
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for large global view cropping. When disabling multi-crop (--local_crops_number 0), we
         recommand using a wider range of scale ("--global_crops_scale 0.14 1." for example)""")
     parser.add_argument('--local_crops_number', type=int, default=8, help="""Number of small
         local views to generate. Set this parameter to 0 to disable multi-crop training.
         When disabling multi-crop we recommend to use "--global_crops_scale 0.14 1." """)
-    parser.add_argument('--local_crops_scale', type=float, nargs='+', default= 0.05,
+    parser.add_argument('--local_crops_scale', type=float, nargs='+', default=0.125,
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for small local view cropping of multi-crop.""")
-    parser.add_argument('--fix_number_gene_crop', type=utils.bool_flag, default=False, help="""Whether or not use a fixed 
+    parser.add_argument('--fix_number_gene_crop', type=utils.bool_flag, default=True, help="""Whether or not use a fixed 
     number of genes in the crop""")
     parser.add_argument('--local_crop_gene_number', type=int, default=250, help="""Local crop gene number""")
     parser.add_argument('--global_crop_gene_number', type=int, default=500, help="""Global crop gene number""")

@@ -230,6 +230,7 @@ class VisionTransformerCat(nn.Module):
 
   def forward(self, x):
     B, L = x.shape
+    print(f'The Crop size is {L}!')
     x = self.prepare_tokens(x)
     for blk in self.blocks:
       x = blk(x)
@@ -335,6 +336,7 @@ class VisionTransformerAdd(nn.Module):
 
     def forward(self, x):
         B, L = x.shape
+        print(f'The Crop size is {L}!')
         x = self.prepare_tokens(x)
         for blk in self.blocks:
             x = blk(x)

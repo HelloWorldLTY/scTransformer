@@ -11,9 +11,13 @@ A **cell by label** matrix stored in .csv file.
 * 
 ## Scripts
 ### Usage
-
+#### Main Training
 ```bash
 python3 main.py --expr_path "/content/drive/Shareddrives/Documentation/Data/bm/rna_scale_bmcite.csv" --meta_path "/content/drive/Shareddrives/Documentation/Data/bm/meta.csv" --label_name "celltype.l2" --output_dir '../result' --fuse_mode "cat" --fix_number True
+```
+#### Gene embedding visualization
+```bash
+python3 gene_embedding_visulization.py --checkpoint_path /home/zhanzitong/maomao/scTransformer/Dec30_fixed_number_crop_correct/checkpoint0200.pth --gene_number 2000 --model_category vit --model_name vit_cat --output_dir ./test0.png
 ```
 Standarize the code we have in the notebooks now:
 * Delete the unused parameters and write documents of the input out parameters.
