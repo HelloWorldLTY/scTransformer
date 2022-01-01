@@ -65,7 +65,7 @@ def get_args_parser():
     parser.add_argument('--heads', default=2, type=int,
                         help="""Number of multi-heads""")
     # Jiaxin changed the default out_dim to 30
-    parser.add_argument('--out_dim', default=30, type=int, help="""Dimensionality of
+    parser.add_argument('--out_dim', default=128, type=int, help="""Dimensionality of
         the output representation. For complex and large datasets large values (like 65k) work well.""")
 
     ## Embedding dimension parameters
@@ -115,7 +115,7 @@ def get_args_parser():
         help optimization for larger ViT architectures. 0 for disabling.""")
 
 
-    parser.add_argument('--batch_size_per_gpu', default=64, type=int,
+    parser.add_argument('--batch_size_per_gpu', default=16, type=int,
         help='Per-GPU batch-size : number of distinct images loaded on one GPU.')
     parser.add_argument('--epochs', default=500, type=int, help='Number of epochs of training.')
 
@@ -135,17 +135,17 @@ def get_args_parser():
     parser.add_argument('--drop_path_rate', type=float, default=0.1, help="stochastic depth rate")
 
     # Multi-crop parameters
-    parser.add_argument('--global_crops_scale', type=float, nargs='+', default=0.25,
+    parser.add_argument('--global_crops_scale', type=float, nargs='+', default=0.5,
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for large global view cropping. When disabling multi-crop (--local_crops_number 0), we
         recommand using a wider range of scale ("--global_crops_scale 0.14 1." for example)""")
     parser.add_argument('--local_crops_number', type=int, default=8, help="""Number of small
         local views to generate. Set this parameter to 0 to disable multi-crop training.
         When disabling multi-crop we recommend to use "--global_crops_scale 0.14 1." """)
-    parser.add_argument('--local_crops_scale', type=float, nargs='+', default=0.125,
+    parser.add_argument('--local_crops_scale', type=float, nargs='+', default=0.25,
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for small local view cropping of multi-crop.""")
-    parser.add_argument('--fix_number_gene_crop', type=utils.bool_flag, default=True, help="""Whether or not use a fixed 
+    parser.add_argument('--fix_number_gene_crop', type=utils.bool_flag, default=False, help="""Whether or not use a fixed 
     number of genes in the crop""")
     parser.add_argument('--local_crop_gene_number', type=int, default=250, help="""Local crop gene number""")
     parser.add_argument('--global_crop_gene_number', type=int, default=500, help="""Global crop gene number""")
@@ -163,7 +163,7 @@ def get_args_parser():
     parser.add_argument('--output_dir', default=".", type=str, help='Path to save logs and checkpoints.')
     parser.add_argument('--saveckp_freq', default=20, type=int, help='Save checkpoint every x epochs.')
     # Jiaxin (Dec 28) Default seed changed to 42
-    parser.add_argument('--seed', default=42, type=int, help='Random seed.')
+    parser.add_argument('--seed', default=0, type=int, help='Random seed.')
     parser.add_argument('--num_workers', default=10, type=int, help='Number of data loading workers per GPU.')
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
@@ -189,7 +189,7 @@ def train_dino(args):
 
     print(f'This dataset has {gene_number} genes!')
 
-    transform = GeneSetCrop(
+    crop = GeneSetCrop(
         global_crops_scale=args.global_crops_scale,
         local_crops_scale=args.local_crops_scale,
         local_crops_number=args.local_crops_number,
@@ -198,7 +198,7 @@ def train_dino(args):
         local_crop_gene_number=args.local_crop_gene_number
     )
 
-    dataset = scRNACSV(expr, meta, args.label_name, instance = False, transform=transform)
+    dataset = scRNACSV(expr, meta, args.label_name, instance=False, transform=crop)
 
     trainset_length = int(len(dataset) * 0.8)
     testset_length = len(dataset) - trainset_length
@@ -214,8 +214,6 @@ def train_dino(args):
         pin_memory=True,
         drop_last=True,
     )
-
-
     print(f"Data loaded: there are {len(dataset)} cells.")
 
     # ============ building student and teacher networks ... ============
@@ -230,7 +228,7 @@ def train_dino(args):
             expression_embed=args.expression_embed,
             depth=args.depth,
             heads=args.heads,
-            drop_path_rate=args.drop_path_rate,  # stochastic depth
+            #drop_path_rate=args.drop_path_rate,  # stochastic depth # TODO: What is this?
         )
         teacher = vits.__dict__['vit_cat'](
             gene_number=gene_number,
@@ -238,7 +236,7 @@ def train_dino(args):
             expression_embed=args.expression_embed,
             depth=args.depth,
             heads=args.heads,
-            drop_path_rate=args.drop_path_rate,  # stochastic depth
+            #drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
         embed_dim = student.embed_dim
     elif args.fuse_mode == 'add':
@@ -248,7 +246,7 @@ def train_dino(args):
             expression_embed=args.expression_embed,
             depth=args.depth,
             heads=args.heads,
-            drop_path_rate=args.drop_path_rate,  # stochastic depth
+            # drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
         teacher = vits.__dict__['vit_add'](
             gene_number=gene_number,
@@ -256,7 +254,7 @@ def train_dino(args):
             expression_embed=args.expression_embed,
             depth=args.depth,
             heads=args.heads,
-            drop_path_rate=args.drop_path_rate,  # stochastic depth
+            # drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
         embed_dim = student.embed_dim
 

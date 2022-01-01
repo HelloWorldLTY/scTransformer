@@ -29,9 +29,9 @@ class GeneSetCrop(object):
       self.global_crops_scale = global_crops_scale
       self.local_crops_scale = local_crops_scale
       self.local_crops_number = local_crops_number
-      self.fix_number=fix_number
-      self.global_crop_gene_number=global_crop_gene_number
-      self.local_crop_gene_number=local_crop_gene_number
+      self.fix_number = fix_number
+      self.global_crop_gene_number = global_crop_gene_number
+      self.local_crop_gene_number = local_crop_gene_number
 
     def __call__(self, x):
         inputs = []
@@ -54,3 +54,5 @@ class GeneSetCrop(object):
                 local = crop_proportion(x, self.local_crops_scale)
                 inputs.append(local)
         return inputs
+
+
