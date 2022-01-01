@@ -194,9 +194,10 @@ class VisionTransformerCat(nn.Module):
     # This line is to adjust if the gene embedding is learnable
     # self.Embedding.weight.requires_grad = False
 
+    self.apply(self._init_weights)
+
     self.act = nn.LeakyReLU()
     self.exprProj = nn.Linear(1, expression_embed)
-    self.apply(self._init_weights) #TODO: how?
 
   def _init_weights(self, m):
     if isinstance(m, nn.Linear):
@@ -230,7 +231,6 @@ class VisionTransformerCat(nn.Module):
 
   def forward(self, x):
     B, L = x.shape
-    print(f'The Crop size is {L}!')
     x = self.prepare_tokens(x)
     for blk in self.blocks:
       x = blk(x)
@@ -362,7 +362,7 @@ class VisionTransformerAdd(nn.Module):
 
 
 # Wrapper functions
-def vit_cat(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=2, **kwargs):
+def vit_cat(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=8, **kwargs):
     model = VisionTransformerCat(
              gene_number=gene_number,
              gene_embed=gene_embed,
@@ -375,7 +375,7 @@ def vit_cat(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, hea
              **kwargs)
     return model
 
-def vit_add(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=2, **kwargs):
+def vit_add(gene_number=2000, gene_embed=128, expression_embed=128, depth=3, heads=8, **kwargs):
     model = VisionTransformerAdd(
             gene_number=gene_number,
             gene_embed=gene_embed,
