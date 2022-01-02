@@ -11,9 +11,13 @@ A **cell by label** matrix stored in .csv file.
 * 
 ## Scripts
 ### Usage
-#### Main Training
+#### Main Training （ViT)
 ```bash
 python3 main.py --expr_path "/content/drive/Shareddrives/Documentation/Data/bm/rna_scale_bmcite.csv" --meta_path "/content/drive/Shareddrives/Documentation/Data/bm/meta.csv" --label_name "celltype.l2" --output_dir '../result' --fuse_mode "cat" --fix_number_gene_crop True
+```
+#### Perceiver Training
+```bash
+python3 main.py --expr_path "/content/drive/Shareddrives/Documentation/Data/bm/rna_scale_bmcite.csv" --meta_path "/content/drive/Shareddrives/Documentation/Data/bm/meta.csv" --label_name "celltype.l2" --output_dir '../result' --fuse_mode "cat" --fix_number_gene_crop True --model_name Perceiver
 ```
 #### Gene embedding visualization
 ```bash
