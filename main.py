@@ -38,6 +38,7 @@ import utils
 
 # import models
 import models.vits as vits
+import models.perceiver_pytorch as Perceiver
 from models.vits import DINOHead
 from DataLoaders import scRNACSV
 from GeneSetCrop import GeneSetCrop
@@ -70,6 +71,10 @@ def get_args_parser():
 
     ## Embedding dimension parameters
     # Jiaxin (Dec 28) added to the main
+    parser.add_argument('--model_name', default='vit',
+                        choices=['vit', 'Perceiver'],
+                        type=str,
+                        help="""The name of the model you use""") # Jiaxin (Jan 01) added to give choice of models
     parser.add_argument('--fuse_mode', default='cat',
                         choices=['add', 'cat'],
                         type=str,
@@ -150,6 +155,10 @@ def get_args_parser():
     parser.add_argument('--local_crop_gene_number', type=int, default=250, help="""Local crop gene number""")
     parser.add_argument('--global_crop_gene_number', type=int, default=500, help="""Global crop gene number""")
 
+    # Perceiver parameters
+    parser.add_argument('--num_latents', type=int, default=16, help="""N of latent array""")
+    parser.add_argument('--latent_dim', type=int, default=256, help="D of latent array")
+
     # Misc
     # Jiaxin (Dec 28) new parameter to determine if we need to train with gpu
     parser.add_argument('--use_gpu', type=utils.bool_flag, default=True, help="""Whether or not
@@ -221,43 +230,67 @@ def train_dino(args):
     # args.arch = args.arch.replace("deit", "vit")
 
     # Jiaxin (Dec 28) Use new parameter to initiate the models
-    if args.fuse_mode == 'cat':
-        student = vits.__dict__['vit_cat'](
+    if args.model_name == 'vit':
+        if args.fuse_mode == 'cat':
+            student = vits.__dict__['vit_cat'](
+                gene_number=gene_number,
+                gene_embed=args.gene_embed,
+                expression_embed=args.expression_embed,
+                depth=args.depth,
+                heads=args.heads,
+                #drop_path_rate=args.drop_path_rate,  # stochastic depth # TODO: What is this?
+            )
+            teacher = vits.__dict__['vit_cat'](
+                gene_number=gene_number,
+                gene_embed=args.gene_embed,
+                expression_embed=args.expression_embed,
+                depth=args.depth,
+                heads=args.heads,
+                #drop_path_rate=args.drop_path_rate,  # stochastic depth
+            )
+            embed_dim = student.embed_dim
+        elif args.fuse_mode == 'add':
+            student = vits.__dict__['vit_add'](
+                gene_number=gene_number,
+                gene_embed=args.gene_embed,
+                expression_embed=args.expression_embed,
+                depth=args.depth,
+                heads=args.heads,
+                # drop_path_rate=args.drop_path_rate,  # stochastic depth
+            )
+            teacher = vits.__dict__['vit_add'](
+                gene_number=gene_number,
+                gene_embed=args.gene_embed,
+                expression_embed=args.expression_embed,
+                depth=args.depth,
+                heads=args.heads,
+                # drop_path_rate=args.drop_path_rate,  # stochastic depth
+            )
+            embed_dim = student.embed_dim
+    elif args.model_name == 'Perceiver':
+        student = Perceiver.Perceiver(
+            fuse_mode=args.fuse_mode,
+            depth=3,
+            num_latents=args.num_latents,
+            latent_dim=args.latent_dim,
+            cross_heads=args.heads,
+            latent_heads=args.heads,
             gene_number=gene_number,
             gene_embed=args.gene_embed,
-            expression_embed=args.expression_embed,
-            depth=args.depth,
-            heads=args.heads,
-            #drop_path_rate=args.drop_path_rate,  # stochastic depth # TODO: What is this?
+            expression_embed=args.expression_embed
         )
-        teacher = vits.__dict__['vit_cat'](
+        teacher = Perceiver.Perceiver(
+            fuse_mode=args.fuse_mode,
+            depth=3,
+            num_latents=args.num_latents,
+            latent_dim=args.latent_dim,
+            cross_heads=args.heads,
+            latent_heads=args.heads,
             gene_number=gene_number,
             gene_embed=args.gene_embed,
-            expression_embed=args.expression_embed,
-            depth=args.depth,
-            heads=args.heads,
-            #drop_path_rate=args.drop_path_rate,  # stochastic depth
+            expression_embed=args.expression_embed
         )
         embed_dim = student.embed_dim
-    elif args.fuse_mode == 'add':
-        student = vits.__dict__['vit_add'](
-            gene_number=gene_number,
-            gene_embed=args.gene_embed,
-            expression_embed=args.expression_embed,
-            depth=args.depth,
-            heads=args.heads,
-            # drop_path_rate=args.drop_path_rate,  # stochastic depth
-        )
-        teacher = vits.__dict__['vit_add'](
-            gene_number=gene_number,
-            gene_embed=args.gene_embed,
-            expression_embed=args.expression_embed,
-            depth=args.depth,
-            heads=args.heads,
-            # drop_path_rate=args.drop_path_rate,  # stochastic depth
-        )
-        embed_dim = student.embed_dim
-
     # # Deprecated ways to initiate teacher and student
     # # if the network is a Vision Transformer (i.e. vit_tiny, vit_small, vit_base)
     # if args.arch in vits.__dict__.keys():

@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Reduce
 
+
 # helpers
 
 def exists(val):
@@ -80,7 +81,7 @@ class FeedForward(nn.Module):
         return self.net(x)
 
 class Attention(nn.Module):
-    def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 64, dropout = 0.):
+    def __init__(self, query_dim, context_dim=None, heads = 8, dim_head = 64, dropout = 0.):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
@@ -125,11 +126,15 @@ class Perceiver(nn.Module):
     def __init__(
         self,
         *,
-        num_freq_bands,
-        depth,
-        max_freq,
+        fuse_mode='cat',
+        #num_freq_bands,
+        gene_number=2000,  # Number of genes input into the model
+        gene_embed=128,  # Gene embedding dimension
+        expression_embed=128,  # Expression embeddin gdimension
+        depth=3,
+        #max_freq,
         input_channels=1,  # For the single cell data, we only have one channel
-        input_axis=1,  # It's a one dimension vector, not 2 dimentional image
+        #input_axis=1,  # It's a one dimension vector, not 2 dimentional image
         num_latents = 512,
         latent_dim = 512,
         cross_heads=1,
@@ -142,7 +147,8 @@ class Perceiver(nn.Module):
         weight_tie_layers = False,
         fourier_encode_data = True,
         self_per_cross_attn = 1,
-        final_classifier_head = True
+        final_classifier_head = True,
+        drop_rate = 0.
     ):
         """The shape of the final attention mechanism will be:
         depth * (cross attention -> self_per_cross_attn * self attention)
@@ -173,18 +179,28 @@ class Perceiver(nn.Module):
           final_classifier_head: mean pool and project embeddings to number of classes (num_classes) at the end
         """
         super().__init__()
-        self.input_axis = input_axis
-        self.max_freq = max_freq
-        self.num_freq_bands = num_freq_bands
+        # From vit, Jiaxin (Jan 01)
+        embed_dim = gene_embed + expression_embed
+        self.num_features = self.embed_dim = embed_dim  # =3 in this golden truth model
+        self.cls_token = nn.Parameter(-1 * torch.ones(1, 1, embed_dim))
+        self.pos_drop = nn.Dropout(p=drop_rate)
+
+        # Initiate the positional embedding (Gene embedding)
+        self.Embedding = nn.Embedding(gene_number, gene_embed)
+        self.exprProj = nn.Linear(1, expression_embed)
+
+        #self.input_axis = input_axis
+        #self.max_freq = max_freq
+        #self.num_freq_bands = num_freq_bands
 
         self.fourier_encode_data = fourier_encode_data
-        fourier_channels = (input_axis * ((num_freq_bands * 2) + 1)) if fourier_encode_data else 0
-        input_dim = fourier_channels + input_channels
+        #fourier_channels = (input_axis * ((num_freq_bands * 2) + 1)) if fourier_encode_data else 0
+        #input_dim = fourier_channels + input_channels = 29
 
         # Random initialized latent array
         self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
 
-        get_cross_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, input_dim, heads=cross_heads, dim_head = cross_dim_head, dropout = attn_dropout), context_dim = input_dim)
+        get_cross_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, embed_dim, heads=cross_heads, dim_head = cross_dim_head, dropout = attn_dropout), context_dim = embed_dim)
         get_cross_ff = lambda: PreNorm(latent_dim, FeedForward(latent_dim, dropout = ff_dropout))
         get_latent_attn = lambda: PreNorm(latent_dim, Attention(latent_dim, heads = latent_heads, dim_head = latent_dim_head, dropout = attn_dropout))
         get_latent_ff = lambda: PreNorm(latent_dim, FeedForward(latent_dim, dropout = ff_dropout))
@@ -213,8 +229,41 @@ class Perceiver(nn.Module):
         self.to_logits = nn.Sequential(
             Reduce('b n d -> b d', 'mean'),
             nn.LayerNorm(latent_dim),
-            nn.Linear(latent_dim, num_classes)
+            #nn.Linear(latent_dim, num_classes)
         ) if final_classifier_head else nn.Identity()
+
+    def prepare_tokens(self, x):
+        B, L = x.shape
+        x = self.ReformatInput_cat(x)
+        cls_tokens = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        return self.pos_drop(x)
+
+    def ReformatInput_cat(self, x):
+        B, G_2 = x.shape
+        G = int(G_2 / 2)
+        expr, index = torch.split(x, (G, G), dim=1)
+        geneEmbedding = self.Embedding(index.int())
+        expr = expr.reshape(B, G, 1)
+        expr -= expr.min(1, keepdim=True)[0]
+        expr /= (expr.max(1, keepdim=True)[0] + 1e-4)
+        # expr = expr.view(B, G, 1) #TODO: What is this for?
+        expr = self.exprProj(expr)
+        x = torch.cat((expr, geneEmbedding), dim=2)
+        return x
+
+    def ReformatInput_add(self, x):
+        B, G_2 = x.shape
+        G = int(G_2 / 2)
+        expr, index = torch.split(x, (G, G), dim=1)
+        geneEmbedding = self.Embedding(index.int())
+        expr = expr.reshape(B, G, 1)
+        expr -= expr.min(1, keepdim=True)[0]
+        expr /= (expr.max(1, keepdim=True)[0] + 1e-4)
+        # expr = expr.view(B, G, 1) #TODO: What is this for?
+        expr = self.exprProj(expr)
+        x = expr + geneEmbedding
+        return x
 
     def forward(
         self,
@@ -222,24 +271,27 @@ class Perceiver(nn.Module):
         mask = None,
         return_embeddings = False
     ):
-        b, *axis, _, device = *data.shape, data.device
-        assert len(axis) == self.input_axis, 'input data must have the right number of axis'
-
-        if self.fourier_encode_data:
-            # calculate fourier encoded positions in the range of [-1, 1], for all axis
-
-            axis_pos = list(map(lambda size: torch.linspace(-1., 1., steps = size, device = device), axis))
-            pos = torch.stack(torch.meshgrid(*axis_pos, indexing='ij'), dim = -1)
-            enc_pos = fourier_encode(pos, self.max_freq, self.num_freq_bands)
-            enc_pos = rearrange(enc_pos, '... n d -> ... (n d)')
-            enc_pos = repeat(enc_pos, '... -> b ...', b = b)
-
-            data = torch.cat((data, enc_pos), dim = -1)
-
-        # concat to channels of data and flatten axis
-
-        data = rearrange(data, 'b ... d -> b (...) d')
+        # b, *axis, _, device = *data.shape, data.device
+        # assert len(axis) == self.input_axis, 'input data must have the right number of axis'
+        #
+        # if self.fourier_encode_data:
+        #     # calculate fourier encoded positions in the range of [-1, 1], for all axis
+        #
+        #     axis_pos = list(map(lambda size: torch.linspace(-1., 1., steps = size, device = device), axis))
+        #     pos = torch.stack(torch.meshgrid(*axis_pos, indexing='ij'), dim = -1)
+        #     enc_pos = fourier_encode(pos, self.max_freq, self.num_freq_bands)
+        #     enc_pos = rearrange(enc_pos, '... n d -> ... (n d)')
+        #     enc_pos = repeat(enc_pos, '... -> b ...', b = b)
+        #
+        #     data = torch.cat((data, enc_pos), dim=-1)
+        #
+        # # concat to channels of data and flatten axis
+        #
+        # data = rearrange(data, 'b ... d -> b (...) d')
         # x is the latent array
+        b, L = data.shape
+        data = self.prepare_tokens(data)
+
         x = repeat(self.latents, 'n d -> b n d', b=b)
 
         # layers
