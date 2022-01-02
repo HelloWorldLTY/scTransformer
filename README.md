@@ -31,15 +31,14 @@ Standarize the code we have in the notebooks now:
 Scripts to finish (Final editing: NAME, DATE)
 * [X] scDataLoader.py (Jiaxin Nov 20)
 * [X] GeneSetCrop.py (Jiaxin Dec 29)
-* [ ] GeneSetCropFixGeneNumber.py (Jiaxin Dec 29)
+* [X] GeneSetCropFixGeneNumber.py (Jiaxin Dec 29)
 * [X] main.py (Jiaxin Dec 29)
 * [X] model.py (Jiaxin Dec 29)
-  - [X] model_add.py
-  - [X] model_cat.py
-  - [ ] Perceiver.py (Jiaxin Dec 29)
+  - [X] vit.py (Jiaxin Dec 30)
+  - [X] perceiver_pytorch.py (Jiaxin Jan 01)
 * [ ] knn_acc.py (Michelle)
 * [ ] attention_visualization.py (Jie)
-* [ ] gene_embedding.py (Jiaxin)
+* [X] gene_embedding.py (Jiaxin Dec 31)
 * [ ] GRN_construction.py 
 
 Saturday\ 
