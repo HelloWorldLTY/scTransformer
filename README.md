@@ -23,22 +23,27 @@ python3 main.py --expr_path "/content/drive/Shareddrives/Documentation/Data/bm/r
 ```bash
 python3 gene_embedding_visulization.py --checkpoint_path /home/zhanzitong/maomao/scTransformer/Dec30_fixed_number_crop_correct/checkpoint0200.pth --gene_number 2000 --model_category vit --model_name vit_cat --output_dir ./test0.png
 ```
-Standarize the code we have in the notebooks now:
-* Delete the unused parameters and write documents of the input out parameters.
-* Write README file and Add comments to the scripts.
-* 
 
+#### Progress
 Scripts to finish (Final editing: NAME, DATE)
-* [X] scDataLoader.py (Jiaxin Nov 20)
+
+##### Classes in main folder
+* [X] DataLoader.py (Jiaxin Nov 20)
 * [X] GeneSetCrop.py (Jiaxin Dec 29)
 * [X] GeneSetCropFixGeneNumber.py (Jiaxin Dec 29)
 * [X] main.py (Jiaxin Dec 29)
-* [X] model.py (Jiaxin Dec 29)
-  - [X] vit.py (Jiaxin Dec 30)
-  - [X] perceiver_pytorch.py (Jiaxin Jan 01)
+
+##### Models
+* [X] vit.py (Jiaxin Dec 30)
+* [X] perceiver_pytorch.py (Jiaxin Jan 01)
+
+##### Evaluations
 * [ ] knn_acc.py (Michelle)
+
+##### Visualization
 * [ ] attention_visualization.py (Jie)
 * [X] gene_embedding.py (Jiaxin Dec 31)
+* [X] curves.py (Jiaxin Jan 01)
 * [ ] GRN_construction.py 
 
 Saturday\ 
