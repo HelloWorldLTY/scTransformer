@@ -41,7 +41,7 @@ Scripts to finish (Final editing: NAME, DATE)
 * [ ] knn_acc.py (Michelle)
 
 ##### Visualization
-* [ ] attention_visualization.py (Jie)
+* [X] attention_visualization.py (Jie)
 * [X] gene_embedding.py (Jiaxin Dec 31)
 * [X] curves.py (Jiaxin Jan 01)
 * [ ] GRN_construction.py 
@@ -52,8 +52,8 @@ TODO\
 Cell nomalization + log transformation
 * [X] bmcite 
 * [ ] perturbation immunology(Jiaxin)
-* [ ] perturbation (Michelle)
-* [ ] Sciplex (Jie)
+* [X] perturbation (Michelle)
+* [X] Sciplex (Jie)
 
 #### Visualization (Sat)
 
