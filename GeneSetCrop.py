@@ -56,3 +56,10 @@ class GeneSetCrop(object):
         return inputs
 
 
+class GeneCrop(object):
+    def __init__(self, crop_size = 1.0):
+        self.crop_size = crop_size
+
+    def __call__(self, x):
+        ret = crop_proportion(x, self.crop_size)
+        return ret
