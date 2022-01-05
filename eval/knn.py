@@ -85,7 +85,7 @@ def get_args_parser():
     return parser
 
 
-def extract_feature_pipeline(args,data_loader_train,data_loader_val, epoch, gene_number):
+def extract_feature_pipeline(args,data_loader_train,data_loader_val, train_labels, test_labels, epoch, gene_number):
     pretrained_weights = args.pretrained_weights + '/checkpoint' + f'{epoch:04d}.pth'
     # ============ building network ... ============
     if args.model_category == 'vit':
@@ -105,6 +105,7 @@ def extract_feature_pipeline(args,data_loader_train,data_loader_val, epoch, gene
     print(f"Model {args.model_category} built.")
     model.cuda()
     utils.load_pretrained_weights(model, pretrained_weights, args.checkpoint_key)
+    print(model)
     model.eval()
 
     # ============ extract features ... ============
@@ -116,10 +117,7 @@ def extract_feature_pipeline(args,data_loader_train,data_loader_val, epoch, gene
     if utils.get_rank() == 0:
         train_features = nn.functional.normalize(train_features, dim=1, p=2)
         test_features = nn.functional.normalize(test_features, dim=1, p=2)
-
-    train_labels = torch.tensor([s[-1] for s in dataset_train.samples]).long()
-    test_labels = torch.tensor([s[-1] for s in dataset_val.samples]).long()
-    # save features and labels
+    # # save features and labels
     if args.dump_features and dist.get_rank() == 0:
         torch.save(train_features.cpu(), os.path.join(args.dump_features, "trainfeat.pth"))
         torch.save(test_features.cpu(), os.path.join(args.dump_features, "testfeat.pth"))
@@ -133,42 +131,16 @@ def extract_features(model, data_loader):
     metric_logger = utils.MetricLogger(delimiter="  ")
     features = None
     for samples, index in metric_logger.log_every(data_loader, 10):
+        #print(f'This is a round')
         samples = samples.cuda(non_blocking=True)
         index = index.cuda(non_blocking=True)
         feats = model(samples).clone()
-
+        #print(f'This is feats {feats}')
         # init storage feature matrix
         if dist.get_rank() == 0 and features is None:
-            features = torch.zeros(len(data_loader.dataset), feats.shape[-1])
-            if args.use_cuda:
-                features = features.cuda(non_blocking=True)
-            print(f"Storing features into tensor of shape {features.shape}")
-
-        # get indexes from all processes
-        y_all = torch.empty(dist.get_world_size(), index.size(0), dtype=index.dtype, device=index.device)
-        y_l = list(y_all.unbind(0))
-        y_all_reduce = torch.distributed.all_gather(y_l, index, async_op=True)
-        y_all_reduce.wait()
-        index_all = torch.cat(y_l)
-
-        # share features between processes
-        feats_all = torch.empty(
-            dist.get_world_size(),
-            feats.size(0),
-            feats.size(1),
-            dtype=feats.dtype,
-            device=feats.device,
-        )
-        output_l = list(feats_all.unbind(0))
-        output_all_reduce = torch.distributed.all_gather(output_l, feats, async_op=True)
-        output_all_reduce.wait()
-
-        # update storage feature matrix
-        if dist.get_rank() == 0:
-            if args.use_cuda:
-                features.index_copy_(0, index_all, torch.cat(output_l))
-            else:
-                features.index_copy_(0, index_all.cpu(), torch.cat(output_l).cpu())
+            features = feats
+        else:
+            features = torch.cat((features, feats), dim = 0)
     return features
 
 
@@ -241,6 +213,8 @@ if __name__ == '__main__':
     testset_length = len(dataset) - trainset_length
     dataset_train, dataset_val = torch.utils.data.random_split(dataset, [trainset_length, testset_length],
                                                                generator=torch.Generator().manual_seed(args.seed))
+    train_labels = torch.tensor([dataset_train.dataset.labels[i] for i in dataset_train.indices]).long()
+    test_labels = torch.tensor([dataset_val.dataset.labels[i] for i in dataset_val.indices]).long()
 
     sampler = torch.utils.data.DistributedSampler(dataset_train, shuffle=False)
     data_loader_train = torch.utils.data.DataLoader(
@@ -269,7 +243,7 @@ if __name__ == '__main__':
         # need to extract features !
         epoch_range = np.arange(args.start_epoch, args.end_epoch, args.checkpoint_frequency)
         for epoch in epoch_range:
-            train_features, test_features, train_labels, test_labels = extract_feature_pipeline(args, data_loader_train, data_loader_val, epoch, gene_number)
+            train_features, test_features, train_labels, test_labels = extract_feature_pipeline(args, data_loader_train, data_loader_val, train_labels, test_labels, epoch, gene_number)
 
             if utils.get_rank() == 0:
                 if args.use_cuda:
@@ -279,7 +253,7 @@ if __name__ == '__main__':
                     test_labels = test_labels.cuda()
 
                 print("Features are ready!\nStart the k-NN classification.")
-                file_name = args.output_dir + '/' + args.checkpoint_key + "_knn_acc.txt"
+                file_name = args.output_dir + '/' + args.checkpoint_key + f"_cropsize_{args.crop_size}_knn_acc.txt"
                 with open(file_name, mode='a') as f:
                     print(f"epoch: {epoch}, ", file=f, end="")
                     for k in args.nb_knn:
