@@ -12,35 +12,50 @@ import torch
 
 
 class scRNACSV(Dataset):
-  def __init__(self, expr, meta, label_Name, instance=False, transform=None, target_transform=None):
-    self.expr = expr
+  def __init__(self, expr, meta, label_name, instance=False, transform=None, target_transform=None):
+    # Load the expr
+    self.expr = torch.from_numpy(expr.values)
     self.meta = meta
-    self.ifInstance = instance
-    self.cells = list(expr.columns)
-    self.labels = list(meta[label_Name])
-    self.samples = [(self.cells, self.labels[i]) for i in range(len(self.labels))]
 
-    # Get a correspondence relationship between the string label and the integer labels
+    # Cells are the column names of the expr, labels is a column of the meta data
+    self.cells = list(expr.columns)
+    self.labels = list(meta[label_name])
+
+    # Get the uniform labels list and sort the list
     self.label_keys = list(set(self.labels))
     self.label_keys.sort()
+
+    # Generate the label dictionary, where key is the string label, and value is the integer label
     self.label_dic = {}
     for label, i in zip(self.label_keys, range(len(self.label_keys))):
       self.label_dic[label] = i
     print(f"This is the label dictionary of this dataset {self.label_dic}")
-    
+
+    # Assign the string label
+    self.str_label = self.labels
+    self.labels = [self.label_dic[i] for i in self.labels]
+
+    # Assign the transform
     self.transform = transform
     self.target_transform = target_transform
+
+    # If we should return instance index or label
+    self.ifInstance = instance
 
   def __len__(self):
     return self.expr.shape[1]
 
-  def __getitem__(self, idx):
-    one_cell = torch.from_numpy(np.array(self.expr.iloc[:, idx]))
+  def __getitem__(self, idx, return_lab=True):
+    one_cell = self.expr[:, idx]
+
     if self.transform:
       ret = self.transform(one_cell)
     else:
       ret = one_cell
-    lab = self.label_dic[self.labels[idx]]
+
+    lab = self.label_dic[self.str_label[idx]]
+
     if self.ifInstance:
-        lab = idx
-    return ret, lab
+      return ret, idx
+    else:
+      return ret, lab
