@@ -63,3 +63,17 @@ class GeneCrop(object):
     def __call__(self, x):
         ret = crop_proportion(x, self.crop_size)
         return ret
+
+class GeneSetCrop_wo_shuffle(object):
+    def __init__(self, pseudoPara = 0):
+      self.super = pseudoPara
+
+    def __call__(self, x):
+        inputs = []
+        data = x
+        length = x.shape[0]
+        index = np.arange(length)
+
+        corr = torch.from_numpy(index)
+        input = torch.cat([data, corr]).float()
+        return input
