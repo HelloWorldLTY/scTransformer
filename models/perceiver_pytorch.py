@@ -52,7 +52,8 @@ class PreNorm(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.norm_context = nn.LayerNorm(context_dim) if exists(context_dim) else None
 
-    def forward(self, x, **kwargs):
+    def forward(self, x, ifAttn = False, **kwargs):
+
         x = self.norm(x)
 
         if exists(self.norm_context):
@@ -60,7 +61,7 @@ class PreNorm(nn.Module):
             normed_context = self.norm_context(context)
             kwargs.update(context = normed_context)
 
-        return self.fn(x, **kwargs)
+        return self.fn(x, ifAttn, **kwargs)
 
 class GEGLU(nn.Module):
     def forward(self, x):
@@ -77,7 +78,7 @@ class FeedForward(nn.Module):
             nn.Dropout(dropout)
         )
 
-    def forward(self, x):
+    def forward(self, x, ifAttn = False):
         return self.net(x)
 
 class Attention(nn.Module):
@@ -95,7 +96,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim)
 
-    def forward(self, x, context = None, mask = None):
+    def forward(self, x, ifAttn = False, context = None, mask = None):
         h = self.heads
 
         q = self.to_q(x)
@@ -118,7 +119,11 @@ class Attention(nn.Module):
 
         out = einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
-        return self.to_out(out)
+
+        if ifAttn:  # Additionally return attension matrix
+            return attn
+        else:
+            return self.to_out(out)
 
 # main class
 
@@ -181,6 +186,7 @@ class Perceiver(nn.Module):
         super().__init__()
         # From vit, Jiaxin (Jan 01)
         embed_dim = gene_embed + expression_embed
+        print(f'embed dimension of model is {embed_dim}')
         self.num_features = self.embed_dim = embed_dim  # =3 in this golden truth model
         self.cls_token = nn.Parameter(-1 * torch.ones(1, 1, embed_dim))
         self.pos_drop = nn.Dropout(p=drop_rate)
@@ -271,44 +277,47 @@ class Perceiver(nn.Module):
         mask = None,
         return_embeddings = False
     ):
-        # b, *axis, _, device = *data.shape, data.device
-        # assert len(axis) == self.input_axis, 'input data must have the right number of axis'
-        #
-        # if self.fourier_encode_data:
-        #     # calculate fourier encoded positions in the range of [-1, 1], for all axis
-        #
-        #     axis_pos = list(map(lambda size: torch.linspace(-1., 1., steps = size, device = device), axis))
-        #     pos = torch.stack(torch.meshgrid(*axis_pos, indexing='ij'), dim = -1)
-        #     enc_pos = fourier_encode(pos, self.max_freq, self.num_freq_bands)
-        #     enc_pos = rearrange(enc_pos, '... n d -> ... (n d)')
-        #     enc_pos = repeat(enc_pos, '... -> b ...', b = b)
-        #
-        #     data = torch.cat((data, enc_pos), dim=-1)
-        #
-        # # concat to channels of data and flatten axis
-        #
-        # data = rearrange(data, 'b ... d -> b (...) d')
-        # x is the latent array
         b, L = data.shape
         data = self.prepare_tokens(data)
 
         x = repeat(self.latents, 'n d -> b n d', b=b)
 
         # layers
-
         for cross_attn, cross_ff, self_attns in self.layers:
             x = cross_attn(x, context=data, mask=mask) + x
             x = cross_ff(x) + x
-
             for self_attn, self_ff in self_attns:
                 x = self_attn(x) + x
                 x = self_ff(x) + x
 
         # allow for fetching embeddings
-
         if return_embeddings:
             return x
 
         # to logits
-
         return self.to_logits(x)
+    def get_first_layer_results():
+        ...
+
+    def get_last_layer_attn(
+        self,
+        data,
+        mask = None,
+        return_embeddings = False):
+
+        b, L = data.shape
+        data = self.prepare_tokens(data)
+
+        x = repeat(self.latents, 'n d -> b n d', b=b)
+
+        # layers
+        for i, (cross_attn, cross_ff, self_attns) in enumerate(self.layers):
+            if i < len(self.layers) - 1:
+                x = cross_attn(x, context=data, mask=mask) + x
+                x = cross_ff(x) + x
+                for self_attn, self_ff in self_attns:
+                    x = self_attn(x) + x
+                    x = self_ff(x) + x
+            else:
+                x = cross_attn(x, ifAttn=True, context = data, mask = mask)
+        return x
