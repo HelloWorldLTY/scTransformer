@@ -27,6 +27,7 @@ import torch.nn as nn
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch.nn.functional as F
+from torchvision import datasets, transforms
 #from torchvision import datasets, transforms
 #from torchvision import models as torchvision_models
 import numpy as np
@@ -41,7 +42,7 @@ import models.vits as vits
 import models.perceiver_pytorch as Perceiver
 from models.vits import DINOHead
 from DataLoaders import scRNACSV
-from GeneSetCrop import GeneSetCrop
+from GeneSetCrop import GeneSetCrop, FashionMNISTCrop
 
 
 
@@ -177,6 +178,9 @@ def get_args_parser():
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
     parser.add_argument("--local_rank", default=0, type=int, help="Please ignore and do not set this argument.")
+    parser.add_argument('--fashionMNIST', default=False, type=utils.bool_flag, help="If train with the FashionMNIST data")
+    parser.add_argument('--data_path', default='./', type=str, help="""fashionMNIST path""")
+    parser.add_argument('--world_size', default=1, type=int, help = "")
     return parser
 
     # New parameters
@@ -192,27 +196,36 @@ def train_dino(args):
     cudnn.benchmark = True
 
     # ============ preparing data ... ============
-    expr = pd.read_csv(args.expr_path, index_col=0)
-    meta = pd.read_csv(args.meta_path, index_col=0)
-    gene_number = expr.shape[0]
+    
 
-    print(f'This dataset has {gene_number} genes!')
+    if args.fashionMNIST:
+        transform = FashionMNISTCrop(
+            args.global_crops_scale,
+            args.local_crops_scale,
+            args.local_crops_number,
+        )
+        dataset = datasets.FashionMNIST(root = args.data_path, download = True, train = True, transform=transform)
+        gene_number = 784
+    else:
+        expr = pd.read_csv(args.expr_path, index_col=0)
+        meta = pd.read_csv(args.meta_path, index_col=0)
+        gene_number = expr.shape[0]
 
-    crop = GeneSetCrop(
-        global_crops_scale=args.global_crops_scale,
-        local_crops_scale=args.local_crops_scale,
-        local_crops_number=args.local_crops_number,
-        fix_number=args.fix_number_gene_crop,
-        global_crop_gene_number=args.global_crop_gene_number,
-        local_crop_gene_number=args.local_crop_gene_number
-    )
+        print(f'This dataset has {gene_number} genes!')
 
-    dataset = scRNACSV(expr, meta, args.label_name, instance=False, transform=crop)
-
-    trainset_length = int(len(dataset) * 0.8)
-    testset_length = len(dataset) - trainset_length
-    dataset, testset = torch.utils.data.random_split(dataset, [trainset_length, testset_length],
-        generator=torch.Generator().manual_seed(args.seed))
+        crop = GeneSetCrop(
+            global_crops_scale=args.global_crops_scale,
+            local_crops_scale=args.local_crops_scale,
+            local_crops_number=args.local_crops_number,
+            fix_number=args.fix_number_gene_crop,
+            global_crop_gene_number=args.global_crop_gene_number,
+            local_crop_gene_number=args.local_crop_gene_number
+        )
+        dataset = scRNACSV(expr, meta, args.label_name, instance=False, transform=crop)
+        trainset_length = int(len(dataset) * 0.8)
+        testset_length = len(dataset) - trainset_length
+        dataset, testset = torch.utils.data.random_split(dataset, [trainset_length, testset_length],
+            generator=torch.Generator().manual_seed(args.seed))
 
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(

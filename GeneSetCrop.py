@@ -2,6 +2,7 @@
 # Distributed under terms of the MIT license.
 import numpy as np
 import torch
+from torchvision import transforms
 
 # Crop by a proportion
 def crop_proportion(x, size):
@@ -77,3 +78,38 @@ class GeneSetCrop_wo_shuffle(object):
         corr = torch.from_numpy(index)
         input = torch.cat([data, corr]).float()
         return input
+
+class FashionMNISTCrop(object):
+  def __init__(self, global_crops_scale, local_crops_scale, local_crops_number):
+    self.global_crops_scale = global_crops_scale
+    self.local_crops_scale = local_crops_scale
+    self.local_crops_number = local_crops_number
+    self.totensor = transforms.ToTensor()
+  def __call__(self, x):
+    inputs = []
+    data = self.totensor(x)
+    data = torch.flatten(data)
+    global_size = int(784 * self.global_crops_scale)
+    local_size = int(784 * self.local_crops_scale)
+    global_index_1 = np.random.choice(784, size = global_size, replace = False)
+    global_index_2 = np.random.choice(784, size = global_size, replace = False)
+
+    global_corr_1 = torch.from_numpy(global_index_1)
+    global_corr_2 = torch.from_numpy(global_index_2)
+
+    global_data_1 = data[global_index_1,]
+    global_data_2 = data[global_index_2,]
+    #print(data.shape)
+    #print(corr.shape)
+    #labels = torch.from_numpy(label.item()*np.ones(shape = (784,1))).float()
+    global_input_1 = torch.cat([global_data_1, global_corr_1]).float()
+    global_input_2 = torch.cat([global_data_2, global_corr_2]).float()
+    inputs.append(global_input_1)
+    inputs.append(global_input_2)
+    for i in range(self.local_crops_number):
+      index = np.random.choice(784, size = local_size, replace = False)
+      corr = torch.from_numpy(index)
+      data_local = data[index,]
+      input_local = torch.cat([data_local, corr]).float()
+      inputs.append(input_local)
+    return inputs
