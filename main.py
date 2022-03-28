@@ -283,7 +283,7 @@ def train_dino(args):
     elif args.model_name == 'Perceiver':
         student = Perceiver.Perceiver(
             fuse_mode=args.fuse_mode,
-            depth=3,
+            depth=args.depth,
             num_latents=args.num_latents,
             latent_dim=args.latent_dim,
             cross_heads=args.heads,
@@ -294,7 +294,7 @@ def train_dino(args):
         )
         teacher = Perceiver.Perceiver(
             fuse_mode=args.fuse_mode,
-            depth=3,
+            depth=args.depth,
             num_latents=args.num_latents,
             latent_dim=args.latent_dim,
             cross_heads=args.heads,
